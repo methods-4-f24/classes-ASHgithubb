@@ -9,8 +9,10 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
+pacman::p_load(dagitty, tidyverse, brms, here, tidybayes, geomtextpath, gganimate, splines, ggplot)
+
 library(rethinking)
-library(daggity)
+library(dagitty)
 ```
 
 Welcome back to your favorite course of all time. This week we start getting into causal inference - arguably the most important part of all of your Methods courses. Why? Because we finally start practicing *doing science*, not just statistics.
@@ -33,26 +35,99 @@ Conceptual question. Let's say you have bought a farm in Vestjylland. The previo
 
 You are far from a good farmer. You only know how to code. In the morning, the televised weather forecast forecasts substantial heat wave for the next 3 days. You don't know what to do, should you water your crops extra, given this new information? You don't trust your common sense, so you throw in all of the data (soil moisture and air temperature) into your machine learning model. The model predicts that soil moisture for the forecasted values of air temperature will be normal. So you decide not to give the soil extra water. Was that a good decision? Why?
 
+Bad decision, cause the model does not include amount of watering. The heat wave leads to extra watering, which leads to more moisture. Or maybe these are too extreme values for the model to predict realistically. 
+
 #### 5M1.
 
 Invent your own example of a spurious correlation. An outcome variable should be correlated with both predictor variables. But when both predictors are entered in the same model, the correlation between the outcome and one of the predictors should mostly vanish (or at least be greatly reduced). 
 
-See if you can come up with a cogsci-inspired phenomenon. Anxiety? Bliss? Make a DAG and use the *daggity* package to illustrate it. 
+See if you can come up with a cogsci-inspired phenomenon. Anxiety? Bliss? Make a DAG and use the *dagitty* package to illustrate it. 
+
+
+# In this (simulated) example, I'll predict ice cream sales from the temperature and the number of shark attacks. 
 
 ```{r}
 
 # ilustrate your dag
 # What are the conditional independencies of your DAG?
 
+# temperature -> shark attacks (more people swimming) -> ice creams
+
+library(dagitty)
+dag_new <- dagitty( "dag{ 
+                    temp -> ice; 
+                    temp -> attacks; 
+                    attacks -> ice }" )
+coordinates(dag_new) <- list( x=c(A=0,D=1,M=2) , y=c(A=0,D=1,M=0) )
+drawdag( dag_new )
+
 ```
 
 Now see if you can play god and generate the data. This will require you to think even deeper about your variables - what is the scale of each variable and how they interact. Formulate your assumptions in natural language and perhaphs ask ChatGPT to help you with the data simulation process to avoid spending a lot of time looking for the right code. Just make sure that the output matches your desired generative structure. :))
 
+
 ```{r}
 
 # generate your data here
+set.seed(123)
+n <- 100
+temp <- rnorm(n)
+shark <- rnorm(n, temp)
+ice_cream <- rnorm(n, temp)
+
+spur_exp <- tibble(ice_cream, temp, shark) %>%
+  mutate(across(everything(), standardize))
+
+#d = ice, m=sharks, a=temp
+m_temp <- quap(
+    alist(
+        ice_cream ~ dnorm( mu , sigma ) ,
+        mu <- a + b_temp * temp ,
+        a ~ dnorm( 0 , 0.2 ) ,
+        b_temp ~ dnorm( 0 , 0.5 ) ,
+        sigma ~ dexp( 1 )
+    ) , data = spur_exp )
+
+m_shark <- quap(
+    alist(
+        ice_cream ~ dnorm( mu , sigma ) ,
+        mu <- a + b_shark * shark ,
+        a ~ dnorm( 0 , 0.2 ) ,
+        b_shark ~ dnorm( 0 , 0.5 ) ,
+        sigma ~ dexp( 1 )
+    ) , data = spur_exp )
+
+m_both <- quap(
+    alist(
+        ice_cream ~ dnorm( mu , sigma ) ,
+        mu <- a + b_shark*shark + b_temp*temp ,
+        a ~ dnorm( 0 , 0.2 ) ,
+        b_shark ~ dnorm( 0 , 0.5 ) ,
+        b_temp ~ dnorm( 0 , 0.5 ) ,
+        sigma ~ dexp( 1 )
+    ) , data = spur_exp )
+
+
+precis( m_temp )
+precis( m_shark )
+precis( m_both )
+
+plot( coeftab(m_temp,m_shark,m_both), par=c("b_temp","b_shark") )
 
 ```
+
+
+```{r}
+ggplot(spur_exp, aes(temp, ice_cream))+
+  geom_point()+
+  geom_smooth(formula = y ~ x, method = "lm")
+
+ggplot(spur_exp, aes(temp, shark))+
+  geom_point()+
+  geom_smooth(formula = y ~ x, method = "lm")
+```
+
+
 
 #### 5M2.
 
