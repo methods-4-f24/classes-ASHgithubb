@@ -8,6 +8,15 @@ date: "13-02-24"
 knitr::opts_chunk$set(echo = TRUE)
 
 #Answers: https://sr2-solutions.wjakethompson.com/bayesian-inference
+
+#git push origin main
+#git remote add upstream https://github.com/methods-4-f24/methods-4-classes
+#git fetch upstream
+#git merge upstream/main
+#git add . 
+#git commit -m "comment"
+#git push origin main
+
 ```
 
 ```{r}
@@ -16,6 +25,7 @@ devtools::install_github("rmcelreath/rethinking",ref="Experimental")
 ```
 
 ```{r}
+pacman::p_load(dagitty)
 library(rethinking)
 ```
 
@@ -186,7 +196,7 @@ p_grid = seq(from = 0, to = 1, length.out=20)
 prior = rep(1, 20)
 
 # compute likelihood at each value in grid
-likelihood = dbinom(3, size = 4, prob = p_grid)
+likelihood = dbinom(3, size = 4, prob = p_grid) #3 succes out of 4
 
 # compute product of likelihood and prior
 unstd.posterior = likelihood * prior
@@ -207,8 +217,8 @@ p_grid = seq(from = 0, to = 1, length.out=20)
 # define prior
 prior = rep(1, 20)
 
-# compute likelihood at each value in grid
-likelihood = dbinom(5, size = 7, prob = p_grid)
+# compute likelihood at each value in grid 
+likelihood = dbinom(5, size = 7, prob = p_grid) #5 succes of 7
 
 # compute product of likelihood and prior
 unstd.posterior = likelihood * prior
@@ -473,7 +483,59 @@ bb_b_posterior <- (bb_b_likelihood * b_prior) / p_w
 
 bb_b_posterior
 ```
+This task is best solved by drawing up the 'garden of forking paths' from the beginning of the chapter. Essentially, we count how many ways **each starting card** could have produced observation *W* on the second draw. 
 
+Let's start with BB.
+
+```{r, warning=FALSE}
+
+library(dagitty)
+
+# Create a dagitty object
+garden <- dagitty("dag {
+  BB -> B1
+  BB -> B2
+  B1 -> BW
+  B1 -> WW
+  B2 -> BW
+  B2 -> WW
+}")
+
+# Plot it
+plot(garden)
+
+```
+
+As we can see above, if our first card was BB, there are 6 ways the second draw could have been *W* - 3 for one side of BB (B1) and 3 for the other side of BB (B2).
+ 
+Now let's assume the first card drawn was BW and count the ways for the second draw to be *W*.
+
+```{r, warning=FALSE}
+
+# Create our garden
+garden <- dagitty("dag {
+  BW -> B
+  B -> WW
+}")
+
+# Plot it
+plot(garden)
+
+```
+
+If the first card was BW, then the only way to get *W* on the second draw is by pulling the WW card out - either of it's side.
+
+Now we table our findings.
+
+| Cards | Ways to produce observation *W* on second draw |
+|-------|------------------------------------------------|
+| BB    | 6                                              |
+| BW    | 2                                              |
+| WW    | 0                                              |
+
+Total ways to produce observation *W* on second draw: 8
+
+Therefore, to get the probability that the first card drawn was BB is **6/8** or **0.75**.
 
 
 
